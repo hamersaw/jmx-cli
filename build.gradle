@@ -5,6 +5,7 @@ repositories {
 }
 
 dependencies {
+    compile 'info.picocli:picocli:2.3.0'
     compile 'io.earcam.wrapped:com.sun.tools.attach:1.8.0_jdk8u131-b11'
 }
 
