@@ -15,21 +15,31 @@ import java.lang.management.MemoryUsage;;
 import java.util.List;
 import java.util.Properties;
 
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.Callable;
 import javax.management.MBeanServerConnection;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 
 @Command(name = "monitor", description = "monitor a given java virtual machine")
-public class MonitorVM implements Runnable {
+public class MonitorVM implements Callable<Boolean> {
     @Option(names = {"-h", "--help"}, usageHelp = true, description = "display this help messsage")
     private boolean usageHelpRequested = false;
+
+    @Option(names = {"-i", "--interval"}, description = "measurment interval (ms)")
+    private int interval = 1000;
 
     @Parameters(paramLabel = "VM_ID", description = "list of virtual machine id")
     private String[] virtualMachineIds;
 
     @Override
-    public void run() {
+    public Boolean call() throws Exception {
+        System.out.println("timestamp"
+                + ",heap_mem,heap_total_mem,heap_max_mem"
+                + ",non_heap_mem,non_heap_total_mem,non_heap_max_mem");
+
         VirtualMachine virtualMachine = null;
         try {
             // connect to virtual machine
@@ -47,20 +57,40 @@ public class MonitorVM implements Runnable {
             MBeanServerConnection mBeanServerConnection =
                 jmxConnector.getMBeanServerConnection();
 
-            // retrieve memory mxbean
-            MemoryMXBean memoryMXBean =
-                ManagementFactory.newPlatformMXBeanProxy(mBeanServerConnection,
-                    ManagementFactory.MEMORY_MXBEAN_NAME, MemoryMXBean.class);
+            Timer timer = new Timer();
+            timer.scheduleAtFixedRate(new TimerTask() {
+                @Override
+                public void run() {
+                    try {
+                        long timestamp = System.currentTimeMillis() / 1000;
 
-            // print memory usage statistics
-            MemoryUsage heapMemoryUsage = memoryMXBean.getHeapMemoryUsage();
-            System.out.println("HEAP_MEM: " + heapMemoryUsage.getUsed());
-            MemoryUsage nonHeapMemoryUsage = memoryMXBean.getNonHeapMemoryUsage();
-            System.out.println("NON_HEAP_MEM: " + nonHeapMemoryUsage.getUsed());
-        } catch (AgentInitializationException | AgentLoadException
-                | AttachNotSupportedException | IOException e) {
-            e.printStackTrace();
-            System.exit(1);
+                        // retrieve memory mxbean
+                        MemoryMXBean memoryMXBean = 
+                            ManagementFactory.newPlatformMXBeanProxy(
+                                mBeanServerConnection,
+                                ManagementFactory.MEMORY_MXBEAN_NAME,
+                                MemoryMXBean.class
+                            );
+
+                        // print memory usage statistics
+                        MemoryUsage heapMemoryUsage = memoryMXBean.getHeapMemoryUsage();
+                        MemoryUsage nonHeapMemoryUsage =
+                            memoryMXBean.getNonHeapMemoryUsage();
+
+                        System.out.println(timestamp
+                            + "," + heapMemoryUsage.getUsed()
+                            + "," + heapMemoryUsage.getCommitted()
+                            + "," + heapMemoryUsage.getMax()
+                            + "," + nonHeapMemoryUsage.getUsed()
+                            + "," + nonHeapMemoryUsage.getCommitted()
+                            + "," + nonHeapMemoryUsage.getMax());
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        System.exit(1);
+                    }
+                }
+            }, 0, this.interval);
         } finally {
             if (virtualMachine != null) {
                 try {
@@ -70,5 +100,7 @@ public class MonitorVM implements Runnable {
                 }
             }
         }
+
+        return true;
     }
 }
