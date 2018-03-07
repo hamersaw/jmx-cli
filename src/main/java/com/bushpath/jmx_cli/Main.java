@@ -7,7 +7,7 @@ import picocli.CommandLine.RunLast;
 
 import java.util.List;
 
-@Command(name = "main", version = "jmx-cli 0.1", subcommands = {ListVM.class, MonitorVM.class})
+@Command(name = "main", version = "jmx-cli 0.1", subcommands = {ListCommand.class, MonitorCommand.class})
 public class Main {
     @Option(names = {"-V", "--version"}, versionHelp = true, description = "display version info")
     private boolean versionInfoRequested = false;

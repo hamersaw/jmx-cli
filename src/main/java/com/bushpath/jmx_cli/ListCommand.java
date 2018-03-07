@@ -8,7 +8,7 @@ import picocli.CommandLine.Option;
 import java.util.concurrent.Callable;
 
 @Command(name = "list", description = "list running java virtual machines")
-public class ListVM implements Callable<Boolean> {
+public class ListCommand implements Callable<Boolean> {
     @Option(names = {"-h", "--help"}, usageHelp = true, description = "display this help messsage")
     private boolean usageHelpRequested = false;
 

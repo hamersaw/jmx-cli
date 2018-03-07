@@ -9,12 +9,11 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;;
-import java.lang.management.MemoryUsage;;
 import java.util.List;
 import java.util.Properties;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.Callable;
@@ -24,9 +23,12 @@ import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 
 @Command(name = "monitor", description = "monitor a given java virtual machine")
-public class MonitorVM implements Callable<Boolean> {
+public class MonitorCommand implements Callable<Boolean> {
     @Option(names = {"-h", "--help"}, usageHelp = true, description = "display this help messsage")
     private boolean usageHelpRequested = false;
+
+    @Option(names = {"-a", "--average"}, description = "number of measurements to average")
+    private int averageCount = 1;
 
     @Option(names = {"-i", "--interval"}, description = "measurment interval (ms)")
     private int interval = 1000;
@@ -36,9 +38,15 @@ public class MonitorVM implements Callable<Boolean> {
 
     @Override
     public Boolean call() throws Exception {
-        System.out.println("timestamp"
-                + ",heap_mem,heap_total_mem,heap_max_mem"
-                + ",non_heap_mem,non_heap_total_mem,non_heap_max_mem");
+        List<Monitor> monitors = new ArrayList();
+        monitors.add(new MemoryMonitor(this.averageCount));
+
+        // print header
+        StringBuilder header = new StringBuilder("timestamp");
+        for (Monitor monitor : monitors) {
+            header.append("," + monitor.getHeader());
+        }
+        System.out.println(header);
 
         VirtualMachine virtualMachine = null;
         try {
@@ -64,28 +72,13 @@ public class MonitorVM implements Callable<Boolean> {
                     try {
                         long timestamp = System.currentTimeMillis() / 1000;
 
-                        // retrieve memory mxbean
-                        MemoryMXBean memoryMXBean = 
-                            ManagementFactory.newPlatformMXBeanProxy(
-                                mBeanServerConnection,
-                                ManagementFactory.MEMORY_MXBEAN_NAME,
-                                MemoryMXBean.class
-                            );
-
-                        // print memory usage statistics
-                        MemoryUsage heapMemoryUsage = memoryMXBean.getHeapMemoryUsage();
-                        MemoryUsage nonHeapMemoryUsage =
-                            memoryMXBean.getNonHeapMemoryUsage();
-
-                        System.out.println(timestamp
-                            + "," + heapMemoryUsage.getUsed()
-                            + "," + heapMemoryUsage.getCommitted()
-                            + "," + heapMemoryUsage.getMax()
-                            + "," + nonHeapMemoryUsage.getUsed()
-                            + "," + nonHeapMemoryUsage.getCommitted()
-                            + "," + nonHeapMemoryUsage.getMax());
-
-                    } catch (IOException e) {
+                        StringBuilder line =
+                            new StringBuilder(Long.toString(timestamp));
+                        for (Monitor monitor : monitors) {
+                            line.append("," + monitor.getStatistics(mBeanServerConnection));
+                        }
+                        System.out.println(line);
+                    } catch (Exception e) {
                         e.printStackTrace();
                         System.exit(1);
                     }
